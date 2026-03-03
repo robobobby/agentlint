@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentLint — Audit Your AGENTS.md</title>
+<meta name="description" content="Paste any AGENTS.md, CLAUDE.md, or .cursorrules file. Get a structured audit with coverage scores, missing guardrails, and actionable suggestions.">
+<style>
+:root {
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface-2: #1f1f23;
+    --border: #27272a;
+    --border-hover: #3f3f46;
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --text-dim: #71717a;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --orange: #f97316;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --radius: 10px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.25rem; }
+
+/* Header */
+.hero { text-align: center; margin-bottom: 2.5rem; }
+.hero h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.hero .tagline {
+    color: var(--text-muted);
+    font-size: 1rem;
+    margin-top: 0.4rem;
+    max-width: 520px;
+    margin-inline: auto;
+}
+.hero .research-note {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    margin-top: 0.75rem;
+}
+.hero .research-note a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Input area */
+.input-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    position: relative;
+}
+.input-area textarea {
+    width: 100%;
+    min-height: 220px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    padding: 1rem;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.input-area textarea:focus { border-color: var(--border-hover); }
+.input-area textarea::placeholder { color: var(--text-dim); }
+
+.input-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    align-items: center;
+}
+
+.btn {
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font);
+}
+.btn-primary {
+    background: #fff;
+    color: #000;
+}
+.btn-primary:hover { background: #e5e5e5; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-secondary {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--border-hover); color: var(--text); }
+
+.sample-links {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+    font-size: 0.78rem;
+}
+.sample-links span { color: var(--text-dim); }
+.sample-links a {
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+.sample-links a:hover { color: var(--text); }
+
+/* Results */
+.results { display: none; }
+.results.visible { display: block; }
+
+/* Grade card */
+.grade-card {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    text-align: center;
+    margin-bottom: 1.25rem;
+}
+.grade-display {
+    font-size: 5rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+}
+.grade-score { font-size: 1.15rem; color: var(--text-muted); margin-top: 0.3rem; }
+.grade-coverage { font-size: 0.82rem; color: var(--text-dim); margin-top: 0.15rem; }
+
+/* Stats row */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+}
+@media (max-width: 600px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.85rem;
+    text-align: center;
+}
+.stat-value { font-size: 1.5rem; font-weight: 700; color: #fff; }
+.stat-label { font-size: 0.7rem; color: var(--text-dim); margin-top: 0.1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* Pillars */
+.pillar-section { margin-bottom: 1.25rem; }
+.pillar-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.6rem;
+}
+.pillar-header h3 { font-size: 1rem; font-weight: 600; }
+.pillar-header .score { margin-left: auto; color: var(--text-dim); font-weight: 400; font-size: 0.85rem; }
+
+.category {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.category:hover { border-color: var(--border-hover); }
+.category.expanded { border-color: var(--border-hover); }
+
+.cat-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.cat-name { font-weight: 500; font-size: 0.88rem; flex: 1; }
+.cat-score { font-weight: 700; font-size: 0.88rem; min-width: 45px; text-align: right; }
+
+.cat-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 0.4rem; }
+.cat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+.cat-details {
+    display: none;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+}
+.category.expanded .cat-details { display: block; }
+
+.cat-desc { font-size: 0.78rem; color: var(--text-dim); }
+.cat-prevalence { font-size: 0.72rem; color: var(--text-dim); font-style: italic; margin-top: 0.15rem; }
+.cat-signals { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.35rem; }
+.cat-signals span { background: var(--bg); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.72rem; display: inline-block; margin: 0.15rem 0.2rem 0.15rem 0; }
+
+.cat-suggestions { list-style: none; margin-top: 0.4rem; }
+.cat-suggestions li {
+    font-size: 0.78rem;
+    color: var(--yellow);
+    padding: 0.15rem 0;
+}
+.cat-suggestions li::before { content: "💡 "; }
+
+/* Suggestions section */
+.suggestions-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-top: 1.25rem;
+}
+.suggestions-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.6rem; }
+.suggestions-list { list-style: none; counter-reset: suggestion; }
+.suggestions-list li {
+    counter-increment: suggestion;
+    font-size: 0.85rem;
+    color: #d4d4d8;
+    padding: 0.3rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+}
+.suggestions-list li::before {
+    content: counter(suggestion);
+    position: absolute;
+    left: 0;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Share */
+.share-bar {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    justify-content: center;
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    margin-top: 3rem;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+.footer a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Spin animation */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinning { animation: spin 1s linear infinite; display: inline-block; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="hero">
+        <h1>AgentLint</h1>
+        <p class="tagline">Paste any AGENTS.md, CLAUDE.md, or context file. Get an instant audit with scores, gaps, and suggestions.</p>
+        <p class="research-note">Rubric based on <a href="https://arxiv.org/abs/2511.12884" target="_blank">empirical study of 2,303 agent context files</a></p>
+    </div>
+
+    <div class="input-area">
+        <textarea id="input" placeholder="# AGENTS.md&#10;&#10;Paste your agent context file here...&#10;&#10;Supports: AGENTS.md, CLAUDE.md, .cursorrules, copilot-instructions.md, or any Markdown agent config."></textarea>
+        <div class="input-actions">
+            <button class="btn btn-primary" id="audit-btn" onclick="runAudit()">Audit</button>
+            <button class="btn btn-secondary" id="clear-btn" onclick="clearAll()">Clear</button>
+            <div class="sample-links">
+                <span>Try:</span>
+                <a onclick="loadSample('minimal')">Minimal</a>
+                <a onclick="loadSample('comprehensive')">Comprehensive</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="results" id="results"></div>
+
+    <div class="footer">
+        <p>AgentLint is free, open source, and runs entirely in your browser. No data leaves your machine.</p>
+        <p style="margin-top: 0.3rem;">Built by <a href="https://github.com/robobobby">Bobby</a> · <a href="https://github.com/robobobby/agentlint">GitHub</a></p>
+    </div>
+</div>
+
+<script>
+// ─── AgentLint Engine (browser port) ────────────────────────────────
+
+const CATEGORIES = [
+    // Functional
+    {
+        name: "Build & Run Commands", slug: "build_run", pillar: "functional",
+        description: "Commands to build, install dependencies, start dev servers.",
+        prevalence: "62.3% of files include this", weight: 1.0,
+        patterns: [
+            [/\b(npm|yarn|pnpm|pip|cargo|go|make|gradle|maven)\s+(install|build|run|start|dev|test)/gi, 3, "Package manager commands"],
+            [/\b(docker|docker-compose|podman)\b/gi, 2, "Container commands"],
+            [/```\s*(bash|sh|shell|zsh|cmd|powershell)?\s*\n/gi, 2, "Shell code blocks"],
+            [/\b(build|compile|bundle|deploy)\s+(command|step|instruction)/gi, 2, "Build instructions"],
+            [/\b(getting\s+started|quick\s*start|setup|installation)\b/gi, 1, "Setup section"],
+        ],
+        suggestions: [
+            "Add build/install commands (e.g., `npm install`, `pip install -r requirements.txt`)",
+            "Include dev server startup command",
+            "Specify the package manager you use",
+        ],
+    },
+    {
+        name: "Implementation Details", slug: "implementation", pillar: "functional",
+        description: "Specific guidance on how code should be written: patterns, idioms, libraries.",
+        prevalence: "69.9% of files include this", weight: 1.0,
+        patterns: [
+            [/\b(use|prefer|always|never|avoid)\b.{0,40}\b(pattern|library|framework|module|function|class|method)\b/gi, 3, "Implementation guidance"],
+            [/\b(import|require|include|from)\b.{0,30}\b(instead|rather|not)\b/gi, 2, "Import preferences"],
+            [/\b(singleton|factory|observer|decorator|middleware|hook|provider)\b/gi, 2, "Design patterns"],
+            [/\b(do\s+not|don't|never|avoid|prefer|always|must)\b/gi, 2, "Directive language"],
+            [/\b(convention|guideline|rule|standard|practice)\b/gi, 1, "Convention references"],
+        ],
+        suggestions: [
+            "Specify which libraries/frameworks the agent should use",
+            "Document coding patterns and idioms preferred in this project",
+            "Add 'always/never' rules for common implementation decisions",
+        ],
+    },
+    {
+        name: "Architecture", slug: "architecture", pillar: "functional",
+        description: "System architecture, directory structure, component relationships.",
+        prevalence: "67.7% of files include this", weight: 1.0,
+        patterns: [
+            [/\b(architect|structure|layout|organization|hierarchy)\b/gi, 2, "Architecture language"],
+            [/(directory|folder|file)\s+(structure|layout|tree|organization)/gi, 3, "Directory structure"],
+            [/\b(component|module|service|layer|package|namespace)\b.{0,30}\b(responsible|handles|manages|contains)\b/gi, 3, "Component responsibilities"],
+            [/(src|lib|app|packages?|modules?|components?)\/\w+/gi, 2, "Path references"],
+            [/\b(monorepo|microservice|serverless|modular|layered|hexagonal|clean\s+arch)\b/gi, 2, "Architecture pattern"],
+        ],
+        suggestions: [
+            "Document the project's directory structure with a tree diagram",
+            "Describe major components/modules and their responsibilities",
+            "Explain the architecture pattern used (monorepo, microservices, etc.)",
+        ],
+    },
+    {
+        name: "Code Style", slug: "code_style", pillar: "functional",
+        description: "Formatting, naming conventions, linting rules.",
+        prevalence: "~55% of files include this", weight: 0.8,
+        patterns: [
+            [/\b(eslint|prettier|black|ruff|rubocop|gofmt|rustfmt|clang-format)\b/gi, 3, "Linter/formatter"],
+            [/\b(naming\s+convention|camelCase|snake_case|PascalCase|kebab-case)\b/gi, 3, "Naming conventions"],
+            [/\b(indent|tab|space|semicolon|quote|bracket)\b.{0,20}\b(style|prefer|use|convention)\b/gi, 2, "Formatting preferences"],
+            [/\b(type|strict|any)\b.{0,15}\b(check|safe|annotation|hint)\b/gi, 2, "Type safety"],
+            [/\b(comment|docstring|jsdoc|tsdoc|javadoc)\b/gi, 1, "Documentation style"],
+        ],
+        suggestions: [
+            "Specify your linter/formatter (ESLint, Prettier, Black, etc.)",
+            "Document naming conventions",
+            "Add type safety preferences",
+        ],
+    },
+    {
+        name: "Testing", slug: "testing", pillar: "functional",
+        description: "Test commands, frameworks, coverage expectations.",
+        prevalence: "~50% of files include this", weight: 1.0,
+        patterns: [
+            [/\b(test|spec|jest|pytest|mocha|vitest|cypress|playwright|rspec)\b/gi, 2, "Testing frameworks"],
+            [/\b(npm|yarn|pnpm)\s+(test|run\s+test)/gi, 3, "Test commands"],
+            [/\b(coverage|assertion|mock|stub|fixture|snapshot)\b/gi, 2, "Testing concepts"],
+            [/\b(unit\s+test|integration\s+test|e2e|end.to.end)\b/gi, 2, "Test types"],
+            [/\b(test\s+file|\.test\.|\.spec\.|__tests__|tests\/)\b/gi, 2, "Test file conventions"],
+        ],
+        suggestions: [
+            "Add test run command (e.g., `npm test`, `pytest`)",
+            "Specify testing framework and conventions",
+            "Document test file naming/location conventions",
+        ],
+    },
+    {
+        name: "Dependencies", slug: "dependencies", pillar: "functional",
+        description: "Dependency management, version constraints, approved/forbidden packages.",
+        prevalence: "~40% of files include this", weight: 0.7,
+        patterns: [
+            [/\b(dependency|dependencies|package|module)\b.{0,30}\b(manage|install|add|update|upgrade|pin|lock)\b/gi, 3, "Dependency management"],
+            [/\b(version|semver|pin|lock|freeze|constraint)\b/gi, 1, "Version management"],
+            [/\b(do\s+not|don't|never|avoid)\b.{0,30}\b(install|add|import|require)\b/gi, 3, "Forbidden dependencies"],
+            [/\b(approved|allowed|preferred|blessed)\b.{0,15}\b(package|library|dependency)\b/gi, 2, "Approved packages"],
+        ],
+        suggestions: [
+            "List approved/preferred libraries for common needs",
+            "Specify any forbidden dependencies",
+            "Document dependency management approach",
+        ],
+    },
+    // Safety
+    {
+        name: "Security", slug: "security", pillar: "safety",
+        description: "Security guidelines, secrets handling, auth patterns.",
+        prevalence: "14.5% of files include this (CRITICAL GAP)", weight: 1.2,
+        patterns: [
+            [/\b(security|secure|vulnerability|exploit|attack|threat)\b/gi, 2, "Security language"],
+            [/\b(secret|credential|api.key|token|password|auth)\b.{0,30}\b(never|don't|do\s+not|avoid|protect|store|manage)\b/gi, 4, "Secrets management"],
+            [/\b(sanitize|escape|validate|injection|xss|csrf|sqli)\b/gi, 3, "Input validation"],
+            [/\b(encrypt|hash|ssl|tls|https|certificate)\b/gi, 2, "Encryption"],
+            [/\b(rbac|permission|authorize|authenticate|oauth|jwt)\b/gi, 2, "Auth patterns"],
+            [/\b(\.env|environment\s+variable|secret|vault|keychain)\b/gi, 2, "Env/secrets management"],
+        ],
+        suggestions: [
+            "⚠️ CRITICAL: Only 14.5% of context files specify security rules",
+            "Add secrets handling rules (never hardcode API keys, use env vars)",
+            "Specify input validation requirements",
+            "Document authentication/authorization patterns",
+        ],
+    },
+    {
+        name: "Performance", slug: "performance", pillar: "safety",
+        description: "Performance requirements, optimization guidelines, resource constraints.",
+        prevalence: "14.5% of files include this (CRITICAL GAP)", weight: 1.0,
+        patterns: [
+            [/\b(performance|optimize|optimization|efficient|latency|throughput)\b/gi, 2, "Performance language"],
+            [/\b(cache|memoize|debounce|throttle|lazy|eager)\b/gi, 2, "Optimization patterns"],
+            [/\b(memory|cpu|bandwidth|rate.limit|timeout|concurrent)\b/gi, 2, "Resource constraints"],
+            [/\b(bundle\s*size|tree.shak|code.split|chunk|minif)\b/gi, 2, "Build optimization"],
+            [/\b(benchmark|profil|measure|metric)\b/gi, 1, "Measurement"],
+        ],
+        suggestions: [
+            "⚠️ CRITICAL: Only 14.5% of context files specify performance rules",
+            "Add performance-sensitive patterns (caching, pagination, lazy loading)",
+            "Document resource constraints (memory limits, timeout values)",
+        ],
+    },
+    {
+        name: "Error Handling", slug: "error_handling", pillar: "safety",
+        description: "Error handling patterns, logging, graceful degradation.",
+        prevalence: "~25% of files include this", weight: 0.9,
+        patterns: [
+            [/\b(error|exception|fault|failure)\b.{0,30}\b(handle|catch|throw|raise|report|log)\b/gi, 3, "Error handling guidance"],
+            [/\b(try|catch|except|finally|rescue|recover)\b/gi, 1, "Exception keywords"],
+            [/\b(log|logging|logger|console\.(log|error|warn))\b/gi, 2, "Logging guidance"],
+            [/\b(graceful|fallback|retry|circuit.breaker|backoff)\b/gi, 3, "Resilience patterns"],
+            [/\b(monitor|alert|notification|sentry|datadog|newrelic)\b/gi, 2, "Monitoring"],
+        ],
+        suggestions: [
+            "Specify error handling patterns (how to catch, when to throw)",
+            "Document logging conventions",
+            "Add resilience patterns (retry, fallback, circuit breaker)",
+        ],
+    },
+    {
+        name: "Environment", slug: "environment", pillar: "safety",
+        description: "Environment configuration, deployment targets.",
+        prevalence: "~35% of files include this", weight: 0.7,
+        patterns: [
+            [/\b(environment|env)\b.{0,20}\b(variable|config|setting|production|staging|development|local)\b/gi, 3, "Environment config"],
+            [/\b(\.env|dotenv|config\.yml|config\.json)\b/gi, 2, "Config files"],
+            [/\b(production|staging|development|local|ci|cd)\b.{0,20}\b(environment|deploy|build|config)\b/gi, 2, "Environment types"],
+            [/\b(docker|kubernetes|k8s|terraform|aws|gcp|azure|vercel|netlify|heroku)\b/gi, 2, "Infrastructure"],
+            [/\b(deploy|deployment|hosting|infrastructure)\b/gi, 1, "Deployment language"],
+        ],
+        suggestions: [
+            "Document environment variables and their purpose",
+            "Specify environment-specific behavior (dev vs prod)",
+            "Add deployment target and infrastructure notes",
+        ],
+    },
+    // Meta
+    {
+        name: "Documentation", slug: "documentation", pillar: "meta",
+        description: "Documentation standards, inline comments, README maintenance.",
+        prevalence: "~45% of files include this", weight: 0.7,
+        patterns: [
+            [/\b(document|documentation|doc|docs)\b.{0,30}\b(update|maintain|write|add|include)\b/gi, 3, "Documentation guidance"],
+            [/\b(comment|docstring|jsdoc|tsdoc|readme)\b.{0,30}\b(require|must|always|every|each)\b/gi, 3, "Doc requirements"],
+            [/\b(api\s+doc|swagger|openapi|typedoc|sphinx)\b/gi, 2, "API documentation"],
+            [/\b(changelog|release\s+note|migration\s+guide)\b/gi, 2, "Change documentation"],
+        ],
+        suggestions: [
+            "Add documentation standards (when to add comments, docstrings)",
+            "Specify README/changelog update requirements",
+        ],
+    },
+    {
+        name: "Communication", slug: "communication", pillar: "meta",
+        description: "Commit messages, PR descriptions, response format.",
+        prevalence: "~40% of files include this", weight: 0.8,
+        patterns: [
+            [/\b(commit\s+message|conventional\s+commit|semantic\s+commit)\b/gi, 3, "Commit format"],
+            [/\b(pull\s+request|pr|merge\s+request|mr)\b.{0,30}\b(description|template|format|title)\b/gi, 3, "PR format"],
+            [/\b(response|output|format|explain|verbose|concise|brief)\b.{0,20}\b(format|style|tone)\b/gi, 2, "Response format"],
+            [/\b(branch\s+naming|branch\s+name|feature\/|fix\/|hotfix\/)\b/gi, 2, "Branch naming"],
+            [/\b(git\s+flow|trunk|main\s+branch|develop|release)\b/gi, 1, "Git workflow"],
+        ],
+        suggestions: [
+            "Specify commit message format (Conventional Commits, etc.)",
+            "Document PR/MR description requirements",
+            "Add branch naming conventions",
+        ],
+    },
+    {
+        name: "Workflow", slug: "workflow", pillar: "meta",
+        description: "Development workflow, CI/CD, review process.",
+        prevalence: "~50% of files include this", weight: 0.8,
+        patterns: [
+            [/\b(workflow|pipeline|ci|cd|ci\/cd|github\s+actions|gitlab\s+ci|jenkins)\b/gi, 2, "CI/CD references"],
+            [/\b(review|approve|merge|deploy)\b.{0,30}\b(process|step|workflow|before|after)\b/gi, 2, "Review process"],
+            [/\b(pre.commit|post.commit|hook|husky|lint.staged)\b/gi, 2, "Git hooks"],
+            [/\b(step\s*\d|phase\s*\d|stage\s*\d|first|then|next|finally)\b.{0,30}\b(build|test|deploy|review)\b/gi, 2, "Workflow steps"],
+        ],
+        suggestions: [
+            "Document the development workflow (branch → PR → review → merge)",
+            "Specify CI/CD pipeline expectations",
+        ],
+    },
+    {
+        name: "Constraints & Boundaries", slug: "constraints", pillar: "meta",
+        description: "Explicit boundaries on what the agent should NOT do.",
+        prevalence: "~30% of files include this", weight: 1.0,
+        patterns: [
+            [/\b(never|do\s+not|don't|must\s+not|forbidden|prohibited|disallowed)\b/gi, 2, "Prohibition language"],
+            [/\b(scope|boundary|limit|restrict|confine|only)\b.{0,30}\b(change|modify|edit|touch|access)\b/gi, 3, "Scope boundaries"],
+            [/\b(ask|confirm|check|verify)\b.{0,20}\b(before|first|prior)\b/gi, 2, "Approval requirements"],
+            [/\b(out.of.scope|off.limits|read.only|do\s+not\s+modify)\b/gi, 3, "Explicit boundaries"],
+        ],
+        suggestions: [
+            "Add explicit 'never do X' rules for destructive operations",
+            "Specify scope boundaries (which files/dirs are off-limits)",
+            "Add approval requirements for sensitive actions",
+        ],
+    },
+    {
+        name: "Examples", slug: "examples", pillar: "meta",
+        description: "Code examples, sample outputs, reference implementations.",
+        prevalence: "~35% of files include this", weight: 0.6,
+        patterns: [
+            [/\b(example|sample|demo|reference|template)\b/gi, 2, "Example language"],
+            [/```[\w]*\n[\s\S]{20,}?\n```/g, 3, "Code blocks"],
+            [/\b(good|bad|correct|incorrect|right|wrong)\b.{0,15}\b(example|way|approach)\b/gi, 2, "Good/bad examples"],
+            [/\b(e\.g\.|for\s+instance|for\s+example|such\s+as)\b/gi, 1, "Inline examples"],
+        ],
+        suggestions: [
+            "Add code examples showing preferred patterns",
+            "Include good vs. bad examples",
+        ],
+    },
+    {
+        name: "Versioning & Maintenance", slug: "versioning", pillar: "meta",
+        description: "Version management, release process, tech debt handling.",
+        prevalence: "~20% of files include this", weight: 0.5,
+        patterns: [
+            [/\b(version|release|semver|changelog|migration)\b/gi, 2, "Versioning language"],
+            [/\b(deprecat|legacy|tech.debt|refactor|upgrade)\b/gi, 2, "Maintenance language"],
+            [/\b(backward|forward)\s+compat/gi, 2, "Compatibility"],
+            [/\b(breaking\s+change|major|minor|patch)\b/gi, 2, "Version semantics"],
+        ],
+        suggestions: [
+            "Document versioning strategy",
+            "Add guidelines for handling deprecation and tech debt",
+        ],
+    },
+];
+
+function scoreCategory(text, cat) {
+    const signals = [];
+    let rawScore = 0;
+
+    for (const [pattern, points, label] of cat.patterns) {
+        // Reset regex lastIndex
+        pattern.lastIndex = 0;
+        const matches = text.match(pattern);
+        if (matches && matches.length > 0) {
+            const count = matches.length;
+            const effective = points + (count > 1 ? Math.log2(count) * 0.5 : 0);
+            rawScore += effective;
+            signals.push({ label, count });
+        }
+    }
+
+    const maxRaw = cat.patterns.reduce((sum, p) => sum + p[1], 0) * 1.3;
+    let normalized = maxRaw > 0 ? Math.min(10, (rawScore / maxRaw) * 10) : 0;
+
+    // Header bonus
+    const slugParts = cat.slug.replace(/_/g, '|').split('|').slice(0, 2).join('|');
+    const headerRe = new RegExp('^#{1,4}\\s+.*\\b(' + slugParts + ')\\b', 'mi');
+    if (headerRe.test(text)) {
+        normalized = Math.min(10, normalized + 1.5);
+    }
+
+    const sugs = normalized < 4 ? cat.suggestions : (normalized < 7 ? [cat.suggestions[0]] : []);
+
+    return {
+        name: cat.name, slug: cat.slug, pillar: cat.pillar,
+        score: Math.round(normalized * 10) / 10,
+        maxScore: 10, signals, suggestions: sugs,
+        description: cat.description, prevalence: cat.prevalence,
+    };
+}
+
+function computeReadability(text) {
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim());
+    const words = text.match(/\b\w+\b/g) || [];
+    if (!words.length || !sentences.length) return { score: 0, grade: "N/A", wordCount: 0, sentenceCount: 0 };
+
+    function countSyllables(word) {
+        word = word.toLowerCase();
+        let count = 0;
+        const vowels = 'aeiouy';
+        if (vowels.includes(word[0])) count++;
+        for (let i = 1; i < word.length; i++) {
+            if (vowels.includes(word[i]) && !vowels.includes(word[i - 1])) count++;
+        }
+        if (word.endsWith('e')) count--;
+        if (word.endsWith('le') && word.length > 2 && !vowels.includes(word[word.length - 3])) count++;
+        return Math.max(1, count);
+    }
+
+    const totalSyllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
+    const asl = words.length / sentences.length;
+    const asw = totalSyllables / words.length;
+    const fre = 206.835 - (1.015 * asl) - (84.6 * asw);
+
+    let grade = "Very Difficult";
+    if (fre >= 60) grade = "Standard";
+    else if (fre >= 30) grade = "Difficult";
+
+    return { score: Math.round(fre * 10) / 10, grade, wordCount: words.length, sentenceCount: sentences.length };
+}
+
+function analyzeStructure(text) {
+    const lines = text.split('\n');
+    const headers = { h1: 0, h2: 0, h3: 0, h4: 0, h5: 0, h6: 0 };
+    for (const line of lines) {
+        const m = line.match(/^(#{1,6})\s+/);
+        if (m) headers[`h${m[1].length}`]++;
+    }
+    const totalHeaders = Object.values(headers).reduce((a, b) => a + b, 0);
+    const codeBlocks = (text.match(/```/g) || []).length >> 1;
+
+    let depth = "shallow";
+    if (headers.h4 > 3 || headers.h5 > 0) depth = "deep";
+    else if (headers.h3 > 5) depth = "moderate";
+
+    return { headers, totalHeaders, totalLines: lines.length, codeBlocks, depth };
+}
+
+function runAuditEngine(text) {
+    const results = CATEGORIES.map(cat => scoreCategory(text, cat));
+
+    const pillarScores = {};
+    for (const pillar of ["functional", "safety", "meta"]) {
+        const cats = results.filter(r => r.pillar === pillar)
+            .map((r, i) => ({ r, c: CATEGORIES.find(c => c.slug === r.slug) }));
+        if (cats.length) {
+            const wSum = cats.reduce((s, { r, c }) => s + r.score * c.weight, 0);
+            const wTotal = cats.reduce((s, { r, c }) => s + c.weight, 0);
+            pillarScores[pillar] = Math.round(wSum / wTotal * 10) / 10;
+        }
+    }
+
+    const overallScore = Math.round((
+        (pillarScores.functional || 0) * 0.35 +
+        (pillarScores.safety || 0) * 0.40 +
+        (pillarScores.meta || 0) * 0.25
+    ) * 10) / 10;
+
+    let grade;
+    const w = overallScore;
+    if (w >= 9) grade = "A+";
+    else if (w >= 8) grade = "A";
+    else if (w >= 7) grade = "A-";
+    else if (w >= 6.5) grade = "B+";
+    else if (w >= 6) grade = "B";
+    else if (w >= 5.5) grade = "B-";
+    else if (w >= 5) grade = "C+";
+    else if (w >= 4.5) grade = "C";
+    else if (w >= 4) grade = "C-";
+    else if (w >= 3.5) grade = "D+";
+    else if (w >= 3) grade = "D";
+    else if (w >= 2) grade = "D-";
+    else grade = "F";
+
+    const readability = computeReadability(text);
+    const structure = analyzeStructure(text);
+
+    // Top suggestions: safety first, then lowest scoring
+    const sorted = [...results].sort((a, b) => {
+        if (a.pillar === "safety" && b.pillar !== "safety") return -1;
+        if (b.pillar === "safety" && a.pillar !== "safety") return 1;
+        return a.score - b.score;
+    });
+    const topSuggestions = [];
+    for (const r of sorted) {
+        for (const s of r.suggestions) {
+            if (topSuggestions.length < 10) topSuggestions.push(s);
+        }
+    }
+
+    const covered = results.filter(r => r.score >= 3).length;
+
+    return {
+        grade, overallScore, pillarScores, categories: results,
+        readability, structure, topSuggestions,
+        stats: { covered, total: results.length, pct: Math.round(covered / results.length * 100) },
+    };
+}
+
+// ─── UI ─────────────────────────────────────────────────────────────
+
+function gradeColor(grade) {
+    if (grade.startsWith('A')) return 'var(--green)';
+    if (grade.startsWith('B')) return 'var(--yellow)';
+    if (grade.startsWith('C')) return 'var(--orange)';
+    return 'var(--red)';
+}
+
+function scoreColor(score) {
+    if (score >= 7) return 'var(--green)';
+    if (score >= 4) return 'var(--yellow)';
+    return 'var(--red)';
+}
+
+function runAudit() {
+    const text = document.getElementById('input').value.trim();
+    if (!text) return;
+
+    const result = runAuditEngine(text);
+    renderResults(result);
+}
+
+function renderResults(r) {
+    const el = document.getElementById('results');
+    const pillarLabels = { functional: "Functional", safety: "Safety", meta: "Meta" };
+    const pillarIcons = { functional: "🔧", safety: "🛡️", meta: "📋" };
+
+    let categoriesHTML = '';
+    for (const pillar of ["functional", "safety", "meta"]) {
+        const cats = r.categories.filter(c => c.pillar === pillar);
+        const pscore = r.pillarScores[pillar] || 0;
+
+        categoriesHTML += `<div class="pillar-section">
+            <div class="pillar-header">
+                <h3>${pillarIcons[pillar]} ${pillarLabels[pillar]}</h3>
+                <span class="score">${pscore}/10</span>
+            </div>`;
+
+        for (const cat of cats) {
+            const pct = cat.score / 10 * 100;
+            const color = scoreColor(cat.score);
+            const signalsHTML = cat.signals.length
+                ? `<div class="cat-signals">${cat.signals.map(s => `<span>${s.label} (${s.count}×)</span>`).join('')}</div>`
+                : '';
+            const sugHTML = cat.suggestions.length
+                ? `<ul class="cat-suggestions">${cat.suggestions.map(s => `<li>${s}</li>`).join('')}</ul>`
+                : '';
+
+            categoriesHTML += `
+            <div class="category" onclick="this.classList.toggle('expanded')">
+                <div class="cat-row">
+                    <span class="cat-name">${cat.name}</span>
+                    <span class="cat-score" style="color:${color}">${cat.score}/10</span>
+                </div>
+                <div class="cat-bar"><div class="cat-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+                <div class="cat-details">
+                    <div class="cat-desc">${cat.description}</div>
+                    <div class="cat-prevalence">${cat.prevalence}</div>
+                    ${signalsHTML}
+                    ${sugHTML}
+                </div>
+            </div>`;
+        }
+        categoriesHTML += '</div>';
+    }
+
+    const sugListHTML = r.topSuggestions.map(s => `<li>${s}</li>`).join('');
+
+    el.innerHTML = `
+        <div class="grade-card">
+            <div class="grade-display" style="color:${gradeColor(r.grade)}">${r.grade}</div>
+            <div class="grade-score">${r.overallScore}/10</div>
+            <div class="grade-coverage">${r.stats.covered}/${r.stats.total} categories covered (${r.stats.pct}%)</div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-card"><div class="stat-value">${r.readability.wordCount}</div><div class="stat-label">Words</div></div>
+            <div class="stat-card"><div class="stat-value">${r.structure.totalHeaders}</div><div class="stat-label">Sections</div></div>
+            <div class="stat-card"><div class="stat-value">${r.structure.codeBlocks}</div><div class="stat-label">Code Blocks</div></div>
+            <div class="stat-card"><div class="stat-value">${r.readability.score}</div><div class="stat-label">Readability</div></div>
+        </div>
+        ${categoriesHTML}
+        ${r.topSuggestions.length ? `
+        <div class="suggestions-section">
+            <h3>Top Suggestions</h3>
+            <ol class="suggestions-list">${sugListHTML}</ol>
+        </div>` : ''}
+        <div class="share-bar">
+            <button class="btn btn-secondary" onclick="copyShareText()">📋 Copy Score</button>
+            <button class="btn btn-secondary" onclick="downloadJSON()">⬇️ JSON</button>
+        </div>
+    `;
+    el.classList.add('visible');
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Store result for sharing
+    window._lastResult = r;
+}
+
+function clearAll() {
+    document.getElementById('input').value = '';
+    const el = document.getElementById('results');
+    el.innerHTML = '';
+    el.classList.remove('visible');
+}
+
+function copyShareText() {
+    const r = window._lastResult;
+    if (!r) return;
+    const text = `AgentLint Score: ${r.grade} (${r.overallScore}/10)\n` +
+        `🔧 Functional: ${r.pillarScores.functional}/10\n` +
+        `🛡️ Safety: ${r.pillarScores.safety}/10\n` +
+        `📋 Meta: ${r.pillarScores.meta}/10\n` +
+        `Coverage: ${r.stats.pct}% (${r.stats.covered}/${r.stats.total} categories)\n` +
+        `\nAudit your AGENTS.md → agentlint.web.app`;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = '📋 Copy Score', 1500);
+    });
+}
+
+function downloadJSON() {
+    const r = window._lastResult;
+    if (!r) return;
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'agentlint-report.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ─── Samples ────────────────────────────────────────────────────────
+
+const SAMPLES = {
+    minimal: `# AGENTS.md
+
+## Project Overview
+This is a web application built with React.
+
+## Development
+- Run \`npm install\` to install dependencies
+- Run \`npm run dev\` to start the development server
+
+## Code Style
+- Use TypeScript for all new files
+- Prefer functional components with hooks
+`,
+    comprehensive: `# AGENTS.md
+
+## Project Overview
+A production API service built with Node.js/TypeScript, deployed on AWS ECS.
+
+## Architecture
+\`\`\`
+src/
+├── api/           # Route handlers
+├── services/      # Business logic
+├── models/        # Database models (Prisma)
+├── middleware/     # Express middleware
+├── utils/         # Shared utilities
+└── config/        # Environment config
+\`\`\`
+
+The application follows a layered architecture: Routes → Services → Models.
+Each service handles one domain (users, payments, notifications).
+
+## Build & Run
+\`\`\`bash
+npm install
+npm run dev          # Start with hot-reload
+npm run build        # TypeScript compilation
+npm run start:prod   # Production mode
+docker-compose up    # Full stack with DB
+\`\`\`
+
+## Code Style
+- **Linter:** ESLint + Prettier (run \`npm run lint\`)
+- **Naming:** camelCase for variables/functions, PascalCase for classes/types
+- **Types:** Strict TypeScript (\`strict: true\`). Never use \`any\`.
+- **Imports:** Use path aliases (\`@/services\`, \`@/models\`)
+
+## Testing
+\`\`\`bash
+npm test                 # Run all tests
+npm run test:unit        # Unit tests only
+npm run test:integration # Integration tests
+npm run test:coverage    # With coverage report
+\`\`\`
+
+- Use Jest for unit tests, Supertest for API tests
+- Test files: \`*.test.ts\` next to source files
+- Minimum 80% coverage for new code
+- Mock external services, never call real APIs in tests
+
+## Dependencies
+- Prefer established packages from the Node.js ecosystem
+- Never add packages without checking bundle size impact
+- Always pin exact versions in package.json
+- Approved HTTP client: axios (not fetch, not got)
+
+## Security
+- **NEVER** hardcode secrets, API keys, or credentials
+- Use environment variables via \`@/config\` module
+- All user input MUST be validated with Zod schemas
+- Sanitize all database inputs (Prisma handles this, but validate first)
+- Use helmet middleware for HTTP security headers
+- JWT tokens expire in 1 hour, refresh tokens in 7 days
+- RBAC: check permissions in middleware, not in route handlers
+
+## Performance
+- Use Redis caching for expensive queries (TTL: 5 minutes default)
+- Paginate all list endpoints (max 100 items per page)
+- Use database indexes for frequent query patterns
+- Lazy load heavy modules
+- Rate limit: 100 requests/minute per user
+
+## Error Handling
+- Use custom AppError class for all errors
+- Always log errors with context (userId, requestId, operation)
+- Never swallow exceptions silently
+- Return consistent error format: \`{ error: string, code: string, details?: any }\`
+- Use circuit breaker for external service calls (3 failures → 30s open)
+
+## Environment
+- \`.env.local\` for development (not committed)
+- Environment variables validated at startup via Zod
+- Three environments: development, staging, production
+- Deploy via GitHub Actions → AWS ECS
+- Infrastructure managed with Terraform
+
+## Communication
+- Commit messages: Conventional Commits format
+- Branch naming: \`feature/JIRA-123-description\`, \`fix/JIRA-456-description\`
+- PR description must include: what, why, how to test
+- All PRs require 1 approval + passing CI
+
+## Workflow
+1. Create branch from \`main\`
+2. Implement + write tests
+3. Run \`npm run lint && npm test\` locally
+4. Open PR with description
+5. CI runs: lint, test, build, security scan
+6. Get review approval
+7. Squash merge to main
+8. Auto-deploy to staging, manual promote to production
+
+## Constraints
+- Do NOT modify database schemas directly. Use Prisma migrations.
+- Do NOT access files outside the \`src/\` directory.
+- Do NOT commit .env files or any secrets.
+- Ask before modifying CI/CD pipeline configuration.
+- Never delete data. Use soft deletes with \`deletedAt\` timestamps.
+
+## Examples
+
+### Good: Service with proper error handling
+\`\`\`typescript
+async function getUser(id: string): Promise<User> {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new AppError('User not found', 'USER_NOT_FOUND', 404);
+  return user;
+}
+\`\`\`
+
+### Bad: Swallowing errors
+\`\`\`typescript
+// DON'T DO THIS
+async function getUser(id: string) {
+  try {
+    return await prisma.user.findUnique({ where: { id } });
+  } catch (e) {
+    return null; // Error is lost!
+  }
+}
+\`\`\`
+`,
+};
+
+function loadSample(name) {
+    document.getElementById('input').value = SAMPLES[name];
+    runAudit();
+}
+
+// Auto-audit on paste
+document.getElementById('input').addEventListener('paste', () => {
+    setTimeout(runAudit, 100);
+});
+</script>
+</body>
+</html>
