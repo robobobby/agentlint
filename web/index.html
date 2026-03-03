@@ -276,6 +276,79 @@ body {
 }
 .footer a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
 
+/* Tabs */
+.input-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+.tab {
+    padding: 0.5rem 1.25rem;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    font-family: var(--font);
+    transition: color 0.15s;
+}
+.tab:hover { color: var(--text-muted); }
+.tab.active { color: var(--text); border-bottom-color: #fff; }
+
+/* URL input */
+.url-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.url-field {
+    flex: 1;
+    padding: 0.65rem 0.85rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.url-field:focus { border-color: var(--border-hover); }
+.url-field::placeholder { color: var(--text-dim); }
+.url-hint { font-size: 0.72rem; color: var(--text-dim); margin-top: 0.4rem; }
+.url-status { font-size: 0.82rem; margin-top: 0.5rem; }
+.url-status.error { color: var(--red); }
+.url-status.loading { color: var(--text-muted); }
+.url-status.success { color: var(--green); }
+
+/* Badge */
+.badge-section {
+    text-align: center;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.badge-section img { margin-bottom: 0.5rem; }
+.badge-code {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    word-break: break-all;
+    cursor: pointer;
+    margin-top: 0.5rem;
+}
+.badge-code:hover { border-color: var(--border-hover); color: var(--text); }
+
 /* Spin animation */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinning { animation: spin 1s linear infinite; display: inline-block; }
@@ -291,7 +364,21 @@ body {
     </div>
 
     <div class="input-area">
-        <textarea id="input" placeholder="# AGENTS.md&#10;&#10;Paste your agent context file here...&#10;&#10;Supports: AGENTS.md, CLAUDE.md, .cursorrules, copilot-instructions.md, or any Markdown agent config."></textarea>
+        <div class="input-tabs">
+            <button class="tab active" onclick="switchTab('paste')" id="tab-paste">Paste</button>
+            <button class="tab" onclick="switchTab('url')" id="tab-url">From URL</button>
+        </div>
+        <div id="paste-panel">
+            <textarea id="input" placeholder="# AGENTS.md&#10;&#10;Paste your agent context file here...&#10;&#10;Supports: AGENTS.md, CLAUDE.md, .cursorrules, copilot-instructions.md, or any Markdown agent config."></textarea>
+        </div>
+        <div id="url-panel" style="display:none">
+            <div class="url-input-row">
+                <input type="text" id="url-input" class="url-field" placeholder="https://github.com/user/repo/blob/main/AGENTS.md" />
+                <button class="btn btn-primary" onclick="fetchURL()">Fetch & Audit</button>
+            </div>
+            <p class="url-hint">Supports GitHub blob URLs, raw.githubusercontent.com, or any raw text URL.</p>
+            <div id="url-status" class="url-status"></div>
+        </div>
         <div class="input-actions">
             <button class="btn btn-primary" id="audit-btn" onclick="runAudit()">Audit</button>
             <button class="btn btn-secondary" id="clear-btn" onclick="clearAll()">Clear</button>
@@ -815,9 +902,14 @@ function renderResults(r) {
             <h3>Top Suggestions</h3>
             <ol class="suggestions-list">${sugListHTML}</ol>
         </div>` : ''}
+        <div class="badge-section">
+            <div id="badge-preview"></div>
+            <div class="badge-code" id="badge-markdown" onclick="copyBadge()" title="Click to copy"></div>
+        </div>
         <div class="share-bar">
             <button class="btn btn-secondary" onclick="copyShareText()">📋 Copy Score</button>
             <button class="btn btn-secondary" onclick="downloadJSON()">⬇️ JSON</button>
+            <button class="btn btn-secondary" onclick="downloadBadge()">🏷️ Badge SVG</button>
         </div>
     `;
     el.classList.add('visible');
@@ -825,6 +917,12 @@ function renderResults(r) {
 
     // Store result for sharing
     window._lastResult = r;
+
+    // Render badge
+    const svgStr = generateBadgeSVG(r.grade, r.overallScore);
+    document.getElementById('badge-preview').innerHTML = svgStr;
+    const mdCode = `[![AgentLint: ${r.grade}](https://img.shields.io/badge/AgentLint-${encodeURIComponent(r.grade + ' (' + r.overallScore + '/10)')}-${r.grade.startsWith('A') ? 'brightgreen' : r.grade.startsWith('B') ? 'yellow' : r.grade.startsWith('C') ? 'orange' : 'red'})](https://github.com/robobobby/agentlint)`;
+    document.getElementById('badge-markdown').textContent = mdCode;
 }
 
 function clearAll() {
@@ -842,7 +940,7 @@ function copyShareText() {
         `🛡️ Safety: ${r.pillarScores.safety}/10\n` +
         `📋 Meta: ${r.pillarScores.meta}/10\n` +
         `Coverage: ${r.stats.pct}% (${r.stats.covered}/${r.stats.total} categories)\n` +
-        `\nAudit your AGENTS.md → agentlint.web.app`;
+        `\nAudit your AGENTS.md → robobobby.github.io/agentlint`;
     navigator.clipboard.writeText(text).then(() => {
         const btn = event.target;
         btn.textContent = '✅ Copied!';
@@ -860,6 +958,29 @@ function downloadJSON() {
     a.download = 'agentlint-report.json';
     a.click();
     URL.revokeObjectURL(url);
+}
+
+function downloadBadge() {
+    const r = window._lastResult;
+    if (!r) return;
+    const svg = generateBadgeSVG(r.grade, r.overallScore);
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'agentlint-badge.svg';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function copyBadge() {
+    const md = document.getElementById('badge-markdown').textContent;
+    navigator.clipboard.writeText(md).then(() => {
+        const el = document.getElementById('badge-markdown');
+        const orig = el.textContent;
+        el.textContent = '✅ Copied badge markdown!';
+        setTimeout(() => el.textContent = orig, 1500);
+    });
 }
 
 // ─── Samples ────────────────────────────────────────────────────────
@@ -1014,9 +1135,97 @@ function loadSample(name) {
     runAudit();
 }
 
-// Auto-audit on paste
+// ─── Tabs ───────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+    document.getElementById('tab-paste').classList.toggle('active', tab === 'paste');
+    document.getElementById('tab-url').classList.toggle('active', tab === 'url');
+    document.getElementById('paste-panel').style.display = tab === 'paste' ? 'block' : 'none';
+    document.getElementById('url-panel').style.display = tab === 'url' ? 'block' : 'none';
+    // Hide/show paste-mode audit button
+    document.getElementById('audit-btn').style.display = tab === 'paste' ? '' : 'none';
+}
+
+// ─── URL Fetch ──────────────────────────────────────────────────────
+
+function toRawURL(url) {
+    // github.com/user/repo/blob/branch/path → raw.githubusercontent.com/user/repo/branch/path
+    const gh = url.match(/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)/);
+    if (gh) return `https://raw.githubusercontent.com/${gh[1]}/${gh[2]}/${gh[3]}`;
+    return url;
+}
+
+async function fetchURL() {
+    const urlInput = document.getElementById('url-input');
+    const status = document.getElementById('url-status');
+    let url = urlInput.value.trim();
+    if (!url) return;
+
+    url = toRawURL(url);
+    status.textContent = 'Fetching...';
+    status.className = 'url-status loading';
+
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+        const text = await resp.text();
+        if (text.length < 10) throw new Error('File appears empty');
+
+        // Put it in the textarea and audit
+        document.getElementById('input').value = text;
+        switchTab('paste');
+        status.textContent = '';
+        status.className = 'url-status';
+        runAudit();
+    } catch (e) {
+        status.textContent = `Failed: ${e.message}. Try using a raw URL.`;
+        status.className = 'url-status error';
+    }
+}
+
+// ─── Badge SVG ──────────────────────────────────────────────────────
+
+function generateBadgeSVG(grade, score) {
+    const colors = {
+        'A+': '#22c55e', 'A': '#22c55e', 'A-': '#4ade80',
+        'B+': '#eab308', 'B': '#eab308', 'B-': '#facc15',
+        'C+': '#f97316', 'C': '#f97316', 'C-': '#fb923c',
+        'D+': '#ef4444', 'D': '#ef4444', 'D-': '#f87171',
+        'F': '#dc2626',
+    };
+    const color = colors[grade] || '#71717a';
+    const label = 'AgentLint';
+    const value = `${grade} (${score}/10)`;
+    const labelW = 70;
+    const valueW = 80;
+    const totalW = labelW + valueW;
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="20" role="img" aria-label="${label}: ${value}">
+  <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+  <clipPath id="r"><rect width="${totalW}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${labelW}" height="20" fill="#555"/>
+    <rect x="${labelW}" width="${valueW}" height="20" fill="${color}"/>
+    <rect width="${totalW}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
+    <text x="${labelW/2}" y="14" fill="#010101" fill-opacity=".3">${label}</text>
+    <text x="${labelW/2}" y="13">${label}</text>
+    <text x="${labelW + valueW/2}" y="14" fill="#010101" fill-opacity=".3">${value}</text>
+    <text x="${labelW + valueW/2}" y="13">${value}</text>
+  </g>
+</svg>`;
+}
+
+// ─── Auto-audit on paste ────────────────────────────────────────────
+
 document.getElementById('input').addEventListener('paste', () => {
     setTimeout(runAudit, 100);
+});
+
+// URL input: Enter to fetch
+document.getElementById('url-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') fetchURL();
 });
 </script>
 </body>

@@ -2,6 +2,8 @@
 
 Audit and score your AGENTS.md, CLAUDE.md, `.cursorrules`, or any agent context file against a research-backed rubric.
 
+**[Try it live →](https://robobobby.github.io/agentlint)**
+
 ## What it does
 
 Scores your agent context file across **16 categories** grouped into 3 pillars:
@@ -10,11 +12,17 @@ Scores your agent context file across **16 categories** grouped into 3 pillars:
 - **🛡️ Safety** (40%): Security, performance, error handling, environment
 - **📋 Meta** (25%): Documentation, communication, workflow, constraints, examples, versioning
 
-Safety weighs the most because the [research](https://arxiv.org/abs/2511.12884) found that only **14.5%** of context files specify security or performance rules. That's a problem.
+Safety weighs the most because [research](https://arxiv.org/abs/2511.12884) found that only **14.5%** of 2,303 context files specify security or performance rules.
 
 ## Quick Start
 
-### CLI (Python)
+### Web UI
+
+Visit **[robobobby.github.io/agentlint](https://robobobby.github.io/agentlint)** and paste your file. Everything runs client-side, nothing leaves your browser.
+
+You can also fetch directly from a GitHub URL (paste any repo's blob URL and it converts to raw automatically).
+
+### CLI (Python, zero dependencies)
 
 ```bash
 # Score a file
@@ -30,16 +38,19 @@ python3 agentlint.py .cursorrules --html > report.html
 cat AGENTS.md | python3 agentlint.py -
 ```
 
-### Web UI
+### Install via pip
 
-Open `web/index.html` in your browser. Paste, audit, done. Everything runs client-side.
+```bash
+pip install agentlint
+agentlint AGENTS.md
+```
 
 ## Scoring
 
 Each category gets 0-10 based on:
-- **Pattern matching**: Looks for relevant keywords, commands, and structural markers
-- **Signal density**: More instances = higher confidence (with diminishing returns)
-- **Header bonus**: Dedicated sections for a topic score higher
+- **Pattern matching**: Relevant keywords, commands, and structural markers
+- **Signal density**: More instances raise confidence (with diminishing returns via log2)
+- **Header bonus**: Dedicated sections score higher than scattered mentions
 
 Overall grade: A+ through F, derived from weighted pillar averages.
 
@@ -64,16 +75,24 @@ Overall grade: A+ through F, derived from weighted pillar averages.
 | 15 | Examples | Meta | ~35% |
 | 16 | Versioning & Maintenance | Meta | ~20% |
 
+## Badge
+
+After auditing, grab a badge for your README:
+
+```markdown
+[![AgentLint: A](https://img.shields.io/badge/AgentLint-A%20(8.2%2F10)-brightgreen)](https://github.com/robobobby/agentlint)
+```
+
+The web UI generates the badge markdown automatically.
+
 ## Research Basis
 
 The rubric is derived from ["Agent READMEs: An Empirical Study of Context Files for Agentic Coding"](https://arxiv.org/abs/2511.12884) (2025), which analyzed 2,303 context files from 1,925 repositories across Claude Code, OpenAI Codex, and GitHub Copilot.
 
-Key finding: developers focus heavily on making agents *functional* (build commands, implementation details) but rarely set *guardrails* for security and performance. AgentLint highlights this gap.
-
 ## Zero Dependencies
 
 - **CLI**: Pure Python 3.10+ stdlib. No pip install needed.
-- **Web**: Single HTML file with inline JS. No build step. No framework.
+- **Web**: Single HTML file. No build step. No framework. No tracking.
 
 ## License
 
