@@ -94,6 +94,15 @@ The rubric is derived from ["Agent READMEs: An Empirical Study of Context Files 
 - **CLI**: Pure Python 3.10+ stdlib. No pip install needed.
 - **Web**: Single HTML file. No build step. No framework. No tracking.
 
+## Part of the Agent Quality Toolkit
+
+| Tool | What it tests | Link |
+|------|--------------|------|
+| **AgentLint** | Agent configuration files | Config quality |
+| [AgentEval](https://github.com/robobobby/agenteval) | Agent conversation behavior | [robobobby.github.io/agenteval](https://robobobby.github.io/agenteval) |
+
+AgentLint checks your agent's *configuration*. AgentEval checks your agent's *behavior*. Use both.
+
 ## License
 
 MIT
